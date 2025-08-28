@@ -36,11 +36,10 @@
   const btnSend = $("#btnSend");
 
   // ====== CONFIG ======
-  const SERVER_URL =
-    (window.SERVER_URL || "").trim() ||
-    "https://<server-service-adresin>.onrender.com";
-  const STUN = [{ urls: "stun:stun.l.google.com:19302" }];
-  const MAX_PEERS = 5;
+  // ====== CONFIG ======
+const SERVER_URL = (window.SERVER_URL || "").trim() || "https://anonim-sohbet-yd49.onrender.com";
+const STUN = [{ urls: "stun:stun.l.google.com:19302" }];
+const MAX_PEERS = 5;
 
   // ====== STATE ======
   let ws;
