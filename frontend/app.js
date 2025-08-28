@@ -1,5 +1,4 @@
 // app.js — ANON/VOICE (3–5 kişi, oda kodu + sesli sohbet + mesaj)
-// Not: SERVER_URL'i kendi Render Web Service adresinle değiştir.
 
 (() => {
   // ====== DOM ======
@@ -36,20 +35,19 @@
   const btnSend = $("#btnSend");
 
   // ====== CONFIG ======
-  // ====== CONFIG ======
-const SERVER_URL = (window.SERVER_URL || "").trim() || "https://anonim-sohbet-yd49.onrender.com";
-const STUN = [{ urls: "stun:stun.l.google.com:19302" }];
-const MAX_PEERS = 5;
+  const SERVER_URL = (window.SERVER_URL || "").trim() || "https://anonim-sohbet-yd49.onrender.com";
+  const STUN = [{ urls: "stun:stun.l.google.com:19302" }];
+  const MAX_PEERS = 5;
 
   // ====== STATE ======
   let ws;
   let alias = "";
   let room = "";
-  const myId = genId(8); // bağlantı kimliği (alias'tan bağımsız)
+  const myId = genId(8);
   let micOn = false;
   let localStream = null;
 
-  // peer haritası: remoteId -> { pc, el, audioEl }
+  // peer haritası
   const peers = new Map();
 
   // ====== UI helpers ======
@@ -71,7 +69,7 @@ const MAX_PEERS = 5;
     return (c || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6).replace(/(^.{3})/, "$1-");
   }
   function genCode6() {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // O/0 I/1 yok
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let s = "";
     for (let i = 0; i < 6; i++) s += chars[(Math.random() * chars.length) | 0];
     return s;
@@ -92,7 +90,6 @@ const MAX_PEERS = 5;
     ws.onopen = () => {
       setStatus("ONLINE");
       ws.send(JSON.stringify({ type: "join", room }));
-      // oda içi tanışma — herkes herkese "hello" atar
       setTimeout(() => {
         sendRTC("rtc:hello", { id: myId, alias });
       }, 300);
@@ -116,12 +113,10 @@ const MAX_PEERS = 5;
         return;
       }
 
-      // --- WebRTC sinyalleşme ---
       if (msg.type === "rtc:hello") {
         const remoteId = msg.id;
         if (!remoteId || remoteId === myId) return;
         ensurePeerCard(remoteId, msg.from || "peer");
-        // glare önleme: id'si küçük olan pasif, büyük olan offer başlatır
         if (myId > remoteId && !peers.get(remoteId)?.pc) {
           await createConnectionAndOffer(remoteId);
         }
@@ -173,7 +168,6 @@ const MAX_PEERS = 5;
 
     const pc = new RTCPeerConnection({ iceServers: STUN });
 
-    // UI kartı
     if (!p) {
       const el = ensurePeerCard(remoteId, "peer");
       p = { pc, el, audioEl: el.querySelector("audio") };
@@ -182,19 +176,18 @@ const MAX_PEERS = 5;
       p.pc = pc;
     }
 
-    // ICE
     pc.onicecandidate = (ev) => {
       if (ev.candidate) {
         sendRTC("rtc:candidate", { fromId: myId, to: remoteId, candidate: ev.candidate });
       }
     };
 
-    // Uzak stream
     pc.ontrack = (ev) => {
       p.audioEl.srcObject = ev.streams[0];
+      const play = p.audioEl.play();
+      if (play && typeof play.catch === "function") play.catch(() => {});
     };
 
-    // Yerel mic varsa track ekle
     if (localStream) {
       localStream.getAudioTracks().forEach((t) => pc.addTrack(t, localStream));
     }
@@ -220,6 +213,8 @@ const MAX_PEERS = 5;
       <audio autoplay playsinline></audio>
       <div class="meter"><div class="bar"></div></div>
     `;
+    const audioEl = card.querySelector("audio");
+    audioEl.muted = false;
     peersEl.appendChild(card);
     return card;
   }
@@ -231,16 +226,23 @@ const MAX_PEERS = 5;
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micOn = true;
       btnMic.textContent = "Mikrofon: ON";
-      // mevcut pc'lere ekle
+
       for (const { pc } of peers.values()) {
         if (!pc) continue;
         localStream.getAudioTracks().forEach((t) => pc.addTrack(t, localStream));
       }
+
       startLocalMeter(localStream);
+
+      // yeni: tüm peer'lere tekrar offer gönder
+      for (const remoteId of peers.keys()) {
+        createConnectionAndOffer(remoteId);
+      }
     } catch (e) {
       alert("Mikrofon izni alınamadı.");
     }
   }
+
   function disableMic() {
     if (!micOn) return;
     micOn = false;
@@ -250,8 +252,9 @@ const MAX_PEERS = 5;
       localStream = null;
     }
   }
+
   function startLocalMeter(stream) {
-    const firstBar = peersEl.querySelector(".peer .bar"); // basit: ilk bar'ı kullan
+    const firstBar = peersEl.querySelector(".peer .bar");
     if (!firstBar) return;
     const Ctx = window.AudioContext || window.webkitAudioContext;
     const ctx = new Ctx();
