@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ANON/VOICE</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="wordmark">ANON<span class="slash">/</span>VOICE</div>
+    <div class="status"><span id="statusText">OFFLINE</span></div>
+  </header>
+
+  <main class="container">
+    <!-- Landing -->
+    <section id="landing" class="card show">
+      <h1 class="mono">Anonim Sohbet</h1>
+      <label class="label" for="alias">Takma Ad</label>
+      <input id="alias" class="input" maxlength="24" autocomplete="off" />
+      <div class="actions">
+        <button id="btnCreate" class="btn btn-primary">Grup Oluştur</button>
+        <button id="btnJoin" class="btn btn-secondary">Gruba Katıl</button>
+      </div>
+    </section>
+
+    <!-- Kod oluşturuldu -->
+    <section id="create" class="card">
+      <h2>Grup Kodun</h2>
+      <div class="codebox">
+        <span id="roomCode">---</span>
+        <button id="btnCopy" class="btn btn-outline">Kopyala</button>
+      </div>
+      <div class="actions">
+        <button id="btnEnter" class="btn btn-primary">Odaya Gir</button>
+        <button id="btnBack1" class="btn btn-ghost">Geri</button>
+      </div>
+    </section>
+
+    <!-- Gruba Katıl -->
+    <section id="join" class="card">
+      <h2>Kod Gir</h2>
+      <input id="joinCode" class="input code" placeholder="ABC-123" maxlength="7" />
+      <div class="actions">
+        <button id="btnEnterJoin" class="btn btn-primary">Katıl</button>
+        <button id="btnBack2" class="btn btn-ghost">Geri</button>
+      </div>
+      <div id="joinError" class="error"></div>
+    </section>
+
+    <!-- Oda -->
+    <section id="room" class="room">
+      <div class="room-top">
+        <div class="badge">ROOM: <span id="roomBadge">---</span></div>
+        <div class="pill" id="presence">0 ONLINE</div>
+        <button id="btnLeave" class="btn small btn-ghost">Ayrıl</button>
+      </div>
+      <div class="room-grid">
+        <div class="panel" id="audioPanel">
+          <h3>Sesli Sohbet</h3>
+          <div id="peers"></div>
+          <div class="voice-controls">
+            <button id="btnMic" class="btn btn-primary">Mikrofon</button>
+          </div>
+        </div>
+        <div class="panel" id="chatPanel">
+          <h3>Mesajlar</h3>
+          <ul id="messages" class="messages"></ul>
+          <div class="composer">
+            <input id="msgInput" class="input" placeholder="Mesaj yaz..." maxlength="400" />
+            <button id="btnSend" class="btn btn-secondary">Gönder</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
