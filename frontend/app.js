@@ -1,4 +1,4 @@
-// app.js — ANON/VOICE (3–5 kişi, oda kodu + sesli sohbet + mesaj)
+// app.js — ANON/VOICE (debug version, negotiation fix)
 
 (() => {
   // ====== DOM ======
@@ -47,8 +47,7 @@
   let micOn = false;
   let localStream = null;
 
-  // peer haritası
-  const peers = new Map();
+  const peers = new Map(); // remoteId -> { pc, el, audioEl }
 
   // ====== UI helpers ======
   function show(view) {
@@ -56,15 +55,9 @@
     viewRoom.classList.remove("show");
     (view || landing).classList.add("show");
   }
-  function showRoom() {
-    viewRoom.classList.add("show");
-  }
-  function setPresence(n) {
-    presence.textContent = `${n} ONLINE`;
-  }
-  function setStatus(t) {
-    statusText.textContent = t;
-  }
+  function showRoom() { viewRoom.classList.add("show"); }
+  function setPresence(n) { presence.textContent = `${n} ONLINE`; }
+  function setStatus(t) { statusText.textContent = t; }
   function fmtCode(c) {
     return (c || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6).replace(/(^.{3})/, "$1-");
   }
@@ -74,9 +67,7 @@
     for (let i = 0; i < 6; i++) s += chars[(Math.random() * chars.length) | 0];
     return s;
   }
-  function genId(n = 8) {
-    return Math.random().toString(36).slice(2, 2 + n);
-  }
+  function genId(n = 8) { return Math.random().toString(36).slice(2, 2 + n); }
   function log(line) {
     const li = document.createElement("li");
     li.textContent = line;
@@ -99,20 +90,15 @@
     ws.onmessage = async (e) => {
       const msg = JSON.parse(e.data);
 
-      if (msg.type === "joined") {
-        setPresence(1);
-        return;
-      }
-      if (msg.type === "presence") {
-        setPresence(msg.n || 0);
-        return;
-      }
+      if (msg.type === "joined") { setPresence(1); return; }
+      if (msg.type === "presence") { setPresence(msg.n || 0); return; }
       if (msg.type === "chat") {
         const time = new Date(msg.ts).toLocaleTimeString();
         log(`[${time}] ${msg.alias}: ${msg.text}`);
         return;
       }
 
+      // --- WebRTC signalling ---
       if (msg.type === "rtc:hello") {
         const remoteId = msg.id;
         if (!remoteId || remoteId === myId) return;
@@ -147,9 +133,8 @@
         const remoteId = msg.fromId;
         const p = peers.get(remoteId);
         if (!p || !msg.candidate) return;
-        try {
-          await p.pc.addIceCandidate(msg.candidate);
-        } catch (_) {}
+        try { await p.pc.addIceCandidate(msg.candidate); }
+        catch (_) {}
         return;
       }
     };
@@ -168,6 +153,23 @@
 
     const pc = new RTCPeerConnection({ iceServers: STUN });
 
+    // debug
+    pc.oniceconnectionstatechange = () => {
+      console.log(`[${remoteId}] ICE state = ${pc.iceConnectionState}`);
+    };
+
+    pc.onnegotiationneeded = async () => {
+      console.log(`[${remoteId}] negotiationneeded fired`);
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        sendRTC("rtc:offer", { fromId: myId, to: remoteId, offer });
+      } catch (err) {
+        console.warn("negotiation error", err);
+      }
+    };
+
+    // UI card
     if (!p) {
       const el = ensurePeerCard(remoteId, "peer");
       p = { pc, el, audioEl: el.querySelector("audio") };
@@ -184,8 +186,8 @@
 
     pc.ontrack = (ev) => {
       p.audioEl.srcObject = ev.streams[0];
-      const play = p.audioEl.play();
-      if (play && typeof play.catch === "function") play.catch(() => {});
+      p.audioEl.muted = false;
+      p.audioEl.play().catch(() => {});
     };
 
     if (localStream) {
@@ -213,8 +215,6 @@
       <audio autoplay playsinline></audio>
       <div class="meter"><div class="bar"></div></div>
     `;
-    const audioEl = card.querySelector("audio");
-    audioEl.muted = false;
     peersEl.appendChild(card);
     return card;
   }
@@ -226,18 +226,11 @@
       localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micOn = true;
       btnMic.textContent = "Mikrofon: ON";
-
       for (const { pc } of peers.values()) {
         if (!pc) continue;
         localStream.getAudioTracks().forEach((t) => pc.addTrack(t, localStream));
       }
-
       startLocalMeter(localStream);
-
-      // yeni: tüm peer'lere tekrar offer gönder
-      for (const remoteId of peers.keys()) {
-        createConnectionAndOffer(remoteId);
-      }
     } catch (e) {
       alert("Mikrofon izni alınamadı.");
     }
